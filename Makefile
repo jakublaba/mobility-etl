@@ -1,4 +1,4 @@
-IMAGES=pad-etl-airflow-init pad-etl-airflow-scheduler pad-etl-airflow-webserver
+IMAGES=mobility-etl-airflow-init mobility-etl-airflow-scheduler mobility-etl-airflow-webserver
 
 init:
 	docker compose up airflow-init -d
