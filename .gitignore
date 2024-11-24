@@ -1,0 +1,6 @@
+.idea
+logs
+scheduler
+plugins
+.env
+**/__pychache__
