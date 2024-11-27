@@ -1,6 +1,7 @@
+.venv
 .idea
 logs
 scheduler
 plugins
 .env
-**/__pychache__
+**/__pycache__
