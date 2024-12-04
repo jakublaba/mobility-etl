@@ -1,27 +1,29 @@
 import os
 import time
-import pandas as pd
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
+
+import pandas as pd
 from airflow.decorators import dag, task
 from azure.storage.blob import BlobServiceClient
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 
 # Airflow DAG definition
 @dag(
-    dag_id="scrape_warsaw_traffic_data",
+    dag_id="warsaw-delays",
     schedule="@hourly",
     start_date=datetime(2024, 12, 1),
     end_date=datetime(2025, 1, 2),
     catchup=False,
 )
 def scrape_and_upload_data():
-    @task()
+    @task
     def scrape_data():
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # Enable headless mode
@@ -167,14 +169,14 @@ def scrape_and_upload_data():
         df = pd.DataFrame(all_rows, columns=column_names)
         return df
 
-    @task()
+    @task
     def save_data_as_parquet(df):
         # Save DataFrame to Parquet
         parquet_file = "/tmp/delay_data.parquet"
         df.to_parquet(parquet_file, index=False)
         return parquet_file
 
-    @task()
+    @task
     def upload_to_blob_storage(parquet_file):
         # Upload the parquet file to Azure Blob Storage
         abs_conn_str = os.getenv("ABS_CONNECTION_STRING")
@@ -191,6 +193,5 @@ def scrape_and_upload_data():
     parquet_file = save_data_as_parquet(df)
     upload_to_blob_storage(parquet_file)
 
-    scrape_data() >> save_data_as_parquet(df) >> upload_to_blob_storage(parquet_file)
 
 scrape_and_upload_data()
