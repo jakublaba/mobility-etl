@@ -7,7 +7,7 @@ start: init
 	docker compose up -d
 
 stop:
-	docker compose down --volumes --remove-orphans
+	docker compose down --remove-orphans
 
 restart: stop start
 
