@@ -3,6 +3,3 @@ python-dotenv
 requests
 azure-core
 azure-storage-blob
-pyspark
-pyspark[connect]
-pyspark-stubs
