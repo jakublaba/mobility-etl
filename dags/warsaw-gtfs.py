@@ -51,7 +51,7 @@ def warsaw_gtfs():
             z.extractall(gtfs_dir)
         return gtfs_dir
 
-    @task.pyspark(conn_id="spark_default")
+    @task.pyspark(conn_id="spark-conn")
     def combine_with_existing(
             spark: SparkSession,
             _sc: SparkContext,

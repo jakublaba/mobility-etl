@@ -3,6 +3,6 @@ python-dotenv
 requests
 azure-core
 azure-storage-blob
-pyspark
-pyspark[connect]
-pyspark-stubs
+apache-airflow-providers-common-compat
+apache-airflow-providers-apache-spark
+apache-airflow

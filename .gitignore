@@ -5,3 +5,4 @@ scheduler
 plugins
 .env
 **/__pycache__
+.astro
