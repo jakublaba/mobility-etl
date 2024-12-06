@@ -1,14 +1,12 @@
-FROM apache/airflow:slim-latest-python3.12
+FROM quay.io/astronomer/astro-runtime:12.5.0
 
 USER root
+
 RUN apt-get update && \
-apt-get install -y libpq-dev && \
-rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+apt-get install -y ant openjdk-17-jdk && \
+apt-get clean
 
-USER airflow
-RUN pip install psycopg2-binary
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/
+RUN export JAVA_HOME
 
-COPY dags /opt/airflow/dags
-COPY .env /opt/airflow
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+USER astro
