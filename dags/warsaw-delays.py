@@ -1,30 +1,30 @@
 import os
 import time
-from datetime import datetime
-
 import pandas as pd
-from airflow.decorators import dag, task
-from azure.storage.blob import BlobServiceClient
+from datetime import datetime
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from airflow.decorators import dag, task
+from azure.storage.blob import BlobServiceClient
 
 # Airflow DAG definition
 @dag(
-    dag_id="warsaw-delays",
+    dag_id="scrape_warsaw_traffic_data",
     schedule="@hourly",
     start_date=datetime(2024, 12, 1),
     end_date=datetime(2025, 1, 2),
     catchup=False,
 )
 def scrape_and_upload_data():
-    @task
+    @task()
     def scrape_data():
+
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # Enable headless mode
         chrome_options.add_argument("--no-sandbox")  # Necessary for some environments (like Docker)
@@ -47,11 +47,6 @@ def scrape_and_upload_data():
         agree_button = wait.until(EC.element_to_be_clickable((By.XPATH, button_xpath)))
         agree_button.click()
 
-        # Handle "Rozumiem" button
-        button_xpath_understand = '//button[contains(text(), "Rozumiem")]'
-        understand_button = wait.until(EC.element_to_be_clickable((By.XPATH, button_xpath_understand)))
-        understand_button.click()
-
         # Initial scroll to load content
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight / 4.5);")
 
@@ -65,7 +60,6 @@ def scrape_and_upload_data():
 
         # Variables to track the current page and row index
         current_page = 0
-        current_row_index = 0  # Start with row 0 for the first page
 
         # Function to click the "Next page" button
         def click_next_page():
@@ -101,6 +95,19 @@ def scrape_and_upload_data():
                 print(f"Error checking stop condition: {e}")
                 return False
 
+        # Function to get row indexes with retry mechanism
+        def get_row_indexes(driver, rows_xpath):
+            attempts = 3
+            for attempt in range(attempts):
+                try:
+                    rows = driver.find_elements(By.XPATH, rows_xpath)
+                    return [row.get_attribute("data-rowindex") for row in rows if row.get_attribute("data-rowindex")]
+                except StaleElementReferenceException:
+                    if attempt < attempts - 1:
+                        time.sleep(1)  # Wait before retrying
+                    else:
+                        raise
+
         # Main scraping loop
         while True:
             # Wait for the page to settle after pressing the "Page Down" key
@@ -115,17 +122,20 @@ def scrape_and_upload_data():
 
             # Collect all rows from the table with 9 columns (aria-colcount="9")
             rows_xpath = '//div[@aria-colcount="9"]//div[@role="row"]'  # XPath for rows inside the table with 9 columns
-            rows = driver.find_elements(By.XPATH, rows_xpath)
-
-            # Filter rows and collect data
-            row_indexes = [row.get_attribute("data-rowindex") for row in rows if row.get_attribute("data-rowindex")]
+            row_indexes = get_row_indexes(driver, rows_xpath)
 
             # Scrape data for each row
-            for row in rows:
+            for index in row_indexes:
                 try:
-                    row_cells = row.find_elements(By.XPATH, './/div[@role="cell"]')
+                    row_xpath = f'//div[@aria-colcount="9"]//div[@data-rowindex="{index}"]'
+                    row = driver.find_element(By.XPATH, row_xpath)
+
+                    # Extract cells in the row
+                    cells_xpath = './/div[@role="cell"]'
+                    cells = row.find_elements(By.XPATH, cells_xpath)
+
                     row_values = []
-                    for i, cell in enumerate(row_cells):
+                    for i, cell in enumerate(cells):
                         if i == 0:  # Skip the first cell (checkbox)
                             continue
 
@@ -144,8 +154,12 @@ def scrape_and_upload_data():
                     if row_values:  # Only append non-empty rows
                         all_rows.append(row_values)
 
-                except Exception as e:
-                    print(f"Error processing row: {e}")
+                except NoSuchElementException:
+                    print(f"No such element found for row {index}. Retrying...")
+                    row_indexes = get_row_indexes(driver, rows_xpath)
+                except StaleElementReferenceException:
+                    print(f"Stale element reference for row {index}. Retrying...")
+                    row_indexes = get_row_indexes(driver, rows_xpath)
 
             # Check if we've reached the end of the current page
             current_row_count = len(all_rows)
@@ -167,16 +181,17 @@ def scrape_and_upload_data():
 
         # Create DataFrame and save to CSV
         df = pd.DataFrame(all_rows, columns=column_names)
+        df['Timestamp'] = datetime.now()
         return df
 
-    @task
+    @task()
     def save_data_as_parquet(df):
         # Save DataFrame to Parquet
         parquet_file = "/tmp/delay_data.parquet"
         df.to_parquet(parquet_file, index=False)
         return parquet_file
 
-    @task
+    @task()
     def upload_to_blob_storage(parquet_file):
         # Upload the parquet file to Azure Blob Storage
         abs_conn_str = os.getenv("ABS_CONNECTION_STRING")
@@ -193,5 +208,6 @@ def scrape_and_upload_data():
     parquet_file = save_data_as_parquet(df)
     upload_to_blob_storage(parquet_file)
 
+    scrape_data() >> save_data_as_parquet(df) >> upload_to_blob_storage(parquet_file)
 
 scrape_and_upload_data()
