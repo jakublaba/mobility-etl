@@ -5,11 +5,12 @@ from zipfile import ZipFile
 import dotenv
 import requests
 from airflow.decorators import dag, task
-from azure.storage.blob.aio import BlobServiceClient
+from airflow.utils.log.logging_mixin import LoggingMixin
+from azure.storage.blob import BlobServiceClient
 
 dotenv.load_dotenv()
 GTFS_FEED_URL = os.getenv("GTFS_FEED_URL")
-ABS_CONN_STR = os.getenv("ABS_CONNECTION_STRING")
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 GTFS_BUCKET = "gtfs"
 
 
@@ -21,6 +22,9 @@ GTFS_BUCKET = "gtfs"
     catchup=False
 )
 def warsaw_gtfs():
+    log = LoggingMixin().log
+    gtfs_dir = "/tmp/gtfs"
+    zip_path = f"{gtfs_dir}/warsaw.zip"
     gtfs_files = [
         "agency",
         "calendar_dates",
@@ -33,38 +37,38 @@ def warsaw_gtfs():
     ]
 
     @task
-    def fetch_gtfs_feed() -> str:
+    def fetch_gtfs_feed():
         res = requests.get(GTFS_FEED_URL)
         res.raise_for_status()
-        zip_path = "/tmp/gtfs/warsaw.zip"
         os.makedirs(os.path.dirname(zip_path), exist_ok=True)
         with open(zip_path, "wb") as f:
             f.write(res.content)
-        return zip_path
 
     @task
-    def unzip_gtfs(zip_path: str) -> str:
-        gtfs_dir = os.path.dirname(zip_path)
+    def unzip_gtfs():
         with ZipFile(zip_path, "r") as z:
             z.extractall(gtfs_dir)
-        return gtfs_dir
-    
-    @task
-    def combine_with_existing(
-            file_name: str
-    ):
-        blob_url = (BlobServiceClient
-                    .from_connection_string(ABS_CONN_STR)
-                    .get_blob_client(GTFS_BUCKET, file_name)
-                    .url)
-        existing = spark.read.parquet(blob_url)
-        new = spark.read.csv(os.path.join(gtfs_dir, f"{file_name}.txt"))
-        combined = existing.union(new).dropDuplicates()
-        combined.write.mode("overwrite").parquet(blob_url)
 
-    zip_path_ = fetch_gtfs_feed()
-    gtfs_dir_ = unzip_gtfs(zip_path_)
-    combine_with_existing.partial(gtfs_dir=gtfs_dir_).expand(file_name=gtfs_files)
+    @task
+    def upload_to_azure_storage(file_name: str):
+        local_path = f"{gtfs_dir}/{file_name}.txt"
+        azure_storage_path = datetime.today().strftime("%Y/%m/%d/") + file_name + ".csv"
+        log.info(f"Uploading {local_path} to azure: {azure_storage_path}")
+        with open(local_path, "r") as csv:
+            blob_client = (BlobServiceClient
+                           .from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+                           .get_blob_client(GTFS_BUCKET, azure_storage_path))
+            blob_client.upload_blob(csv.read())
+
+    @task
+    def clean_up():
+        files = ["warsaw.zip", *map(lambda f: f"{f}.txt", gtfs_files)]
+        for file in files:
+            path = f"{gtfs_dir}/{file}"
+            log.info(f"Removing {path}")
+            os.remove(path)
+
+    fetch_gtfs_feed() >> unzip_gtfs() >> upload_to_azure_storage.expand(file_name=gtfs_files) >> clean_up()
 
 
 warsaw_gtfs()

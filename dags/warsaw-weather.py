@@ -17,10 +17,10 @@ from azure.storage.blob import BlobServiceClient
 def warsaw_weather():
     dotenv.load_dotenv()
     imgw_api_url = os.getenv("IMGW_API_URL")
-    abs_conn_str = os.getenv("ABS_CONNECTION_STRING")
+    azure_storage_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     filename = datetime.today().strftime("%Y_%m_%d") + ".csv"
     blob_client = (BlobServiceClient
-                   .from_connection_string(abs_conn_str)
+                   .from_connection_string(azure_storage_connection_string)
                    .get_blob_client(container="weather", blob=filename))
 
     @task.short_circuit()
