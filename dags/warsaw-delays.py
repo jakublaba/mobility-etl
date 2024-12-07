@@ -1,17 +1,19 @@
 import os
 import time
-import pandas as pd
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 from airflow.decorators import dag, task
 from azure.storage.blob import BlobServiceClient
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 
 # Airflow DAG definition
 @dag(
@@ -29,10 +31,10 @@ def scrape_and_upload_data():
         chrome_options.add_argument("--headless")  # Enable headless mode
         chrome_options.add_argument("--no-sandbox")  # Necessary for some environments (like Docker)
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("lang=pl-PL")
 
         # Initialize the WebDriver
-        download_service = Service()  # Add path to chromedriver if necessary
-        driver = webdriver.Chrome(service=download_service, options=chrome_options)
+        driver = webdriver.Remote("http://chrome-driver:4444", options=chrome_options)
 
         # Open the target page
         driver.get("https://czynaczas.pl/warsaw/opoznienia-autobusy-tramwaje")
@@ -185,29 +187,17 @@ def scrape_and_upload_data():
         return df
 
     @task()
-    def save_data_as_parquet(df):
-        # Save DataFrame to Parquet
-        parquet_file = "/tmp/delay_data.parquet"
-        df.to_parquet(parquet_file, index=False)
-        return parquet_file
-
-    @task()
-    def upload_to_blob_storage(parquet_file):
+    def upload_csv_to_blob_storage(df: pd.DataFrame):
         # Upload the parquet file to Azure Blob Storage
-        abs_conn_str = os.getenv("ABS_CONNECTION_STRING")
-        blob_service_client = BlobServiceClient.from_connection_string(abs_conn_str)
-        container_name = "traffic-data"
-        blob_name = f"delay_data_{datetime.today().strftime('%Y_%m_%d')}.parquet"
-        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
-
-        with open(parquet_file, "rb") as data:
-            blob_client.upload_blob(data, overwrite=True)
+        azure_storage_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        blob_service_client = BlobServiceClient.from_connection_string(azure_storage_connection_string)
+        path = datetime.now(tz=ZoneInfo("Europe/Warsaw")).strftime("%Y/%m/%d/delays-%H.csv")
+        blob_client = blob_service_client.get_blob_client(container="traffic", blob=path)
+        blob_client.upload_blob(df.to_csv(index=False))
 
     # Define task dependencies
     df = scrape_data()
-    parquet_file = save_data_as_parquet(df)
-    upload_to_blob_storage(parquet_file)
+    upload_csv_to_blob_storage(df)
 
-    scrape_data() >> save_data_as_parquet(df) >> upload_to_blob_storage(parquet_file)
 
 scrape_and_upload_data()
