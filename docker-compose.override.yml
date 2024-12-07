@@ -1,0 +1,7 @@
+services:
+  chrome-driver:
+    image: selenium/standalone-chrome:131.0-chromedriver-131.0
+    ports:
+      - "7900:7900"
+    networks:
+      - airflow
