@@ -6,8 +6,6 @@ import dotenv
 import requests
 from airflow.decorators import dag, task
 from azure.storage.blob.aio import BlobServiceClient
-from pyspark import SparkContext
-from pyspark.sql import SparkSession
 
 dotenv.load_dotenv()
 GTFS_FEED_URL = os.getenv("GTFS_FEED_URL")
@@ -50,12 +48,9 @@ def warsaw_gtfs():
         with ZipFile(zip_path, "r") as z:
             z.extractall(gtfs_dir)
         return gtfs_dir
-
-    @task.pyspark(conn_id="spark-conn")
+    
+    @task
     def combine_with_existing(
-            spark: SparkSession,
-            _sc: SparkContext,
-            gtfs_dir: str,
             file_name: str
     ):
         blob_url = (BlobServiceClient
