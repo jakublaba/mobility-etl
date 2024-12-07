@@ -7,13 +7,13 @@
 
 airflow:
   connections:
-    - conn_id: spark-conn
-      conn_type: Spark
-      conn_host: spark://spark-master
+    - conn_id:
+      conn_type:
+      conn_host:
       conn_schema:
       conn_login:
       conn_password:
-      conn_port: 7077
+      conn_port:
   pools:
     - pool_name:
       pool_slot:
