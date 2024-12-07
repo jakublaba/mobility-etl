@@ -6,3 +6,5 @@ azure-storage-blob
 apache-airflow-providers-common-compat
 apache-airflow-providers-apache-spark
 apache-airflow
+pyspark
+pyspark-stubs

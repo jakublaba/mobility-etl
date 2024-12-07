@@ -7,8 +7,8 @@
 
 airflow:
   connections:
-    - conn_id: spark-conn
-      conn_type: Spark
+    - conn_id: spark
+      conn_type: spark
       conn_host: spark://spark-master
       conn_schema:
       conn_login:
