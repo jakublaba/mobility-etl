@@ -1,16 +1,16 @@
-FROM apache/airflow:slim-latest-python3.12
+FROM quay.io/astronomer/astro-runtime:12.5.0
 
 USER root
+
+ADD https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.87/linux64/chrome-linux64.zip /tmp/chrome.zip
+ADD https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.87/linux64/chromedriver-linux64.zip /tmp/chrome-driver.zip
+
 RUN apt-get update && \
-apt-get install -y libpq-dev && \
-rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
-mkdir -p /home/airflow/.cache/selenium && \
-chmod -R 555 /home/airflow/.cache/selenium
+apt-get install -y unzip && \
+apt-get clean && \
+unzip /tmp/chrome.zip -d /usr/local/bin/ && \
+unzip /tmp/chrome-driver.zip -d /usr/local/bin/ && \
+chmod 755 /usr/local/bin && \
+rm /tmp/chrome*
 
-USER airflow
-RUN pip install psycopg2-binary
-
-COPY .env /opt/airflow
-COPY requirements.txt .
-COPY dags /opt/airflow/dags
-RUN pip install -r requirements.txt
+USER astro
