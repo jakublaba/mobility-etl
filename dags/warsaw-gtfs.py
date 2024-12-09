@@ -77,7 +77,7 @@ def warsaw_gtfs():
         """
         file_hash = calculate_file_hash(zip_path)
         blob_client = blob_service_client.get_blob_client(GTFS_BUCKET, "latest-feed-hash")
-        blob_client.upload_blob(file_hash)
+        blob_client.upload_blob(file_hash, overwrite=True)
 
     @task
     def unzip_gtfs():

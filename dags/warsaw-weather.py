@@ -9,7 +9,7 @@ from azure.storage.blob import BlobServiceClient
 
 @dag(
     dag_id="warsaw-weather",
-    schedule="@daily",
+    schedule="@hourly",
     start_date=datetime(2024, 12, 1),
     end_date=datetime(2025, 1, 2),
     catchup=False,
@@ -18,7 +18,7 @@ def warsaw_weather():
     dotenv.load_dotenv()
     imgw_api_url = os.getenv("IMGW_API_URL")
     azure_storage_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-    filename = datetime.today().strftime("%Y_%m_%d") + ".csv"
+    filename = datetime.now().strftime("%Y/%m/%d/weather-%H.csv")
     blob_client = (BlobServiceClient
                    .from_connection_string(azure_storage_connection_string)
                    .get_blob_client(container="weather", blob=filename))
