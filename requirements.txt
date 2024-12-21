@@ -6,3 +6,4 @@ azure-storage-blob
 apache-airflow
 pandas
 selenium
+requests
