@@ -11,7 +11,7 @@ from azure.storage.blob import BlobServiceClient
     dag_id="warsaw-weather",
     schedule="@hourly",
     start_date=datetime(2024, 12, 1),
-    end_date=datetime(2025, 1, 2),
+    end_date=datetime(2026, 1, 2),
     catchup=False,
 )
 def warsaw_weather():

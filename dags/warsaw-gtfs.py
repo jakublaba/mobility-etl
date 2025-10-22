@@ -19,7 +19,7 @@ GTFS_BUCKET = "gtfs"
     dag_id="warsaw-gtfs",
     schedule="@daily",
     start_date=datetime(2024, 12, 1),
-    end_date=datetime(2025, 1, 2),
+    end_date=datetime(2026, 1, 2),
     catchup=False
 )
 def warsaw_gtfs():

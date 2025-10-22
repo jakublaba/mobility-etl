@@ -20,7 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
     dag_id="scrape_warsaw_traffic_data",
     schedule="@hourly",
     start_date=datetime(2024, 12, 1),
-    end_date=datetime(2025, 1, 2),
+    end_date=datetime(2026, 1, 2),
     catchup=False,
 )
 def scrape_and_upload_data():

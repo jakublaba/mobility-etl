@@ -6,3 +6,6 @@ plugins
 .env
 **/__pycache__
 .astro
+dags/.airflowignore
+dags/example_dag.py
+tests/**
